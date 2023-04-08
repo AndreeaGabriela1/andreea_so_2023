@@ -60,18 +60,18 @@ void listare(char* path, int size_smaller, char* name_starts_with, int recursiv)
 void parsare(int file)
 {
     HEADER h;
-    lseek(file,-4,SEEK_END);
-    read(file,h.MAGIC,4);
-    h.MAGIC[4] = '\0';
     lseek(file,-6,SEEK_END);
     read(file,&h.HEADER_SIZE,2);
+    read(file,h.MAGIC,4);
+    h.MAGIC[4] = '\0';
+    
     if(strcmp(h.MAGIC,"Xrhm") != 0)
     {
         printf("ERROR\n");
         printf("wrong magic\n");
         return;
     }
-    lseek(file,0,SEEK_SET);
+    lseek(file,-h.HEADER_SIZE,SEEK_CUR);
     read(file,&h.VERSION,4);
     if(h.VERSION < 98 || h.VERSION > 208)
     {
@@ -79,16 +79,14 @@ void parsare(int file)
         printf("wrong version\n");
         return;
     }
-    lseek(file,0,SEEK_CUR);
     read(file,&h.NO_OF_SECTIONS,1);
     if(h.NO_OF_SECTIONS < 6 || h.NO_OF_SECTIONS > 15)
     {
-        printf("%d \n",h.NO_OF_SECTIONS);
         printf("ERROR\n");
         printf("wrong sect_nr");
         return;
     }
-    h.SECTION_HEADERS = (SECTION_HEADER*) malloc(h.NO_OF_SECTIONS*sizeof(SECTION_HEADER*));
+    h.SECTION_HEADERS = (SECTION_HEADER*) malloc(h.NO_OF_SECTIONS*23);
     for(int i = 0; i < h.NO_OF_SECTIONS; i++)
     {
         read(file,h.SECTION_HEADERS[i].SECT_NAME,14);
