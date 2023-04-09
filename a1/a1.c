@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 
 typedef struct{
     char SECT_NAME[14];
@@ -69,7 +70,7 @@ void parsare(int file)
     {
         printf("ERROR\n");
         printf("wrong magic\n");
-        return;
+        exit(EXIT_FAILURE);
     }
     lseek(file,-h.HEADER_SIZE,SEEK_CUR);
     read(file,&h.VERSION,4);
@@ -77,26 +78,26 @@ void parsare(int file)
     {
         printf("ERROR\n");
         printf("wrong version\n");
-        return;
+        exit(EXIT_FAILURE);
     }
     read(file,&h.NO_OF_SECTIONS,1);
     if(h.NO_OF_SECTIONS < 6 || h.NO_OF_SECTIONS > 15)
     {
         printf("ERROR\n");
         printf("wrong sect_nr");
-        return;
+        exit(EXIT_FAILURE);
     }
-    h.SECTION_HEADERS = (SECTION_HEADER*) malloc(h.NO_OF_SECTIONS*23);
+    h.SECTION_HEADERS = (SECTION_HEADER*) malloc(h.NO_OF_SECTIONS*sizeof(SECTION_HEADER));
     for(int i = 0; i < h.NO_OF_SECTIONS; i++)
     {
         read(file,h.SECTION_HEADERS[i].SECT_NAME,14);
         h.SECTION_HEADERS[i].SECT_NAME[14] = '\0';
         read(file,&h.SECTION_HEADERS[i].SECT_TYPE,1);
-        if(h.SECTION_HEADERS[i].SECT_TYPE != 50 || h.SECTION_HEADERS[i].SECT_TYPE != 92 || h.SECTION_HEADERS[i].SECT_TYPE != 33 || h.SECTION_HEADERS[i].SECT_TYPE != 32)
+        if((h.SECTION_HEADERS[i].SECT_TYPE != 50 && h.SECTION_HEADERS[i].SECT_TYPE != 92) && ( h.SECTION_HEADERS[i].SECT_TYPE != 33 && h.SECTION_HEADERS[i].SECT_TYPE != 32))
         {
             printf("ERROR\n");
             printf("wrong sect_types\n");
-            return;
+            exit(EXIT_FAILURE);
         }
         read(file,&h.SECTION_HEADERS[i].SECT_OFFSET,4);
         read(file,&h.SECTION_HEADERS[i].SECT_SIZE,4);
