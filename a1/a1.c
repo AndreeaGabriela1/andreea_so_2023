@@ -7,23 +7,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-typedef struct{
-    char SECT_NAME[14];
-    int SECT_TYPE;
-    int SECT_OFFSET;
-    int SECT_SIZE;
-}SECTION_HEADER;
-
-typedef struct{
-    int VERSION;
-    int NO_OF_SECTIONS;
-    SECTION_HEADER* SECTION_HEADERS;
-    int HEADER_SIZE;
-    char MAGIC[4];
-}HEADER;
-
-
-
 void listare(char* path, int size_smaller, char* name_starts_with, int recursiv)
 {
     DIR *dir = NULL;
@@ -60,56 +43,270 @@ void listare(char* path, int size_smaller, char* name_starts_with, int recursiv)
 
 void parsare(int file)
 {
-    HEADER h;
+    int VERSION;
+    int NO_OF_SECTIONS;
+    int HEADER_SIZE;
+    int SECT_TYPE;
+    int SECT_OFFSET;
+    int SECT_SIZE;
+    char SECT_NAME[14];
+    char MAGIC[4];
+
     lseek(file,-6,SEEK_END);
-    read(file,&h.HEADER_SIZE,2);
-    read(file,h.MAGIC,4);
-    h.MAGIC[4] = '\0';
-    
-    if(strcmp(h.MAGIC,"Xrhm") != 0)
+    read(file,&HEADER_SIZE,2);
+    read(file,MAGIC,4);
+    MAGIC[4] = '\0';
+    if(strcmp(MAGIC,"Xrhm") != 0)
     {
         printf("ERROR\n");
         printf("wrong magic\n");
         exit(EXIT_FAILURE);
     }
-    lseek(file,-h.HEADER_SIZE,SEEK_CUR);
-    read(file,&h.VERSION,4);
-    if(h.VERSION < 98 || h.VERSION > 208)
+    lseek(file,-HEADER_SIZE,SEEK_CUR);
+    read(file,&VERSION,4);
+    if(VERSION < 98 || VERSION > 208)
     {
         printf("ERROR\n");
         printf("wrong version\n");
         exit(EXIT_FAILURE);
     }
-    read(file,&h.NO_OF_SECTIONS,1);
-    if(h.NO_OF_SECTIONS < 6 || h.NO_OF_SECTIONS > 15)
+    read(file,&NO_OF_SECTIONS,1);
+    if(NO_OF_SECTIONS < 6 || NO_OF_SECTIONS > 15)
     {
         printf("ERROR\n");
         printf("wrong sect_nr");
         exit(EXIT_FAILURE);
     }
-    h.SECTION_HEADERS = (SECTION_HEADER*) malloc(h.NO_OF_SECTIONS*sizeof(SECTION_HEADER));
-    for(int i = 0; i < h.NO_OF_SECTIONS; i++)
+    for(int i = 0; i < NO_OF_SECTIONS; i++)
     {
-        read(file,h.SECTION_HEADERS[i].SECT_NAME,14);
-        h.SECTION_HEADERS[i].SECT_NAME[14] = '\0';
-        read(file,&h.SECTION_HEADERS[i].SECT_TYPE,1);
-        if((h.SECTION_HEADERS[i].SECT_TYPE != 50 && h.SECTION_HEADERS[i].SECT_TYPE != 92) && ( h.SECTION_HEADERS[i].SECT_TYPE != 33 && h.SECTION_HEADERS[i].SECT_TYPE != 32))
+        read(file,SECT_NAME,14);
+        SECT_NAME[14] = '\0';
+        read(file,&SECT_TYPE,1);
+        if((SECT_TYPE != 50 && SECT_TYPE != 92) && (SECT_TYPE != 33 && SECT_TYPE != 32))
         {
             printf("ERROR\n");
             printf("wrong sect_types\n");
             exit(EXIT_FAILURE);
         }
-        read(file,&h.SECTION_HEADERS[i].SECT_OFFSET,4);
-        read(file,&h.SECTION_HEADERS[i].SECT_SIZE,4);
+        read(file,&SECT_OFFSET,4);
+        read(file,&SECT_SIZE,4);
     }
     printf("SUCCESS\n");
-    printf("version=%d\n",h.VERSION);
-    printf("nr_sections=%d\n",h.NO_OF_SECTIONS);
-    for(int i = 0; i < h.NO_OF_SECTIONS; i++)
+    printf("version=%d\n",VERSION);
+    printf("nr_sections=%d\n",NO_OF_SECTIONS);
+    lseek(file,-HEADER_SIZE,SEEK_END);
+    lseek(file,5,SEEK_CUR);
+    for(int i = 0; i < NO_OF_SECTIONS; i++)
     {
-        printf("section%d: %s %d %d\n",i+1,h.SECTION_HEADERS[i].SECT_NAME,h.SECTION_HEADERS[i].SECT_TYPE,h.SECTION_HEADERS[i].SECT_SIZE);
+        read(file,SECT_NAME,14);
+        SECT_NAME[14] = '\0';
+        read(file,&SECT_TYPE,1);
+        read(file,&SECT_OFFSET,4);
+        read(file,&SECT_SIZE,4);
+        printf("section%d: %s %d %d\n",i+1,SECT_NAME,SECT_TYPE,SECT_SIZE);
+    } 
+}
+
+void extragere(int file, int section, int line)
+{
+    int VERSION;
+    int NO_OF_SECTIONS;
+    int HEADER_SIZE;
+    int SECT_TYPE;
+    int SECT_OFFSET;
+    int SECT_SIZE;
+    char SECT_NAME[14];
+    char MAGIC[4];
+
+    lseek(file,-6,SEEK_END);
+    read(file,&HEADER_SIZE,2);
+    read(file,MAGIC,4);
+    MAGIC[4] = '\0';
+    if(strcmp(MAGIC,"Xrhm") != 0)
+    {
+        printf("ERROR\n");
+        printf("invalid file\n");
+        exit(EXIT_FAILURE);
     }
-    free(h.SECTION_HEADERS);
+    lseek(file,-HEADER_SIZE,SEEK_CUR);
+    read(file,&VERSION,4);
+    if(VERSION < 98 || VERSION > 208)
+    {
+        printf("ERROR\n");
+        printf("invalid file\n");
+        exit(EXIT_FAILURE);
+    }
+    read(file,&NO_OF_SECTIONS,1);
+    if(NO_OF_SECTIONS < 6 || NO_OF_SECTIONS > 15)
+    {
+        printf("ERROR\n");
+        printf("invalid file");
+        exit(EXIT_FAILURE);
+    }
+    if(NO_OF_SECTIONS < section)
+    {
+        printf("ERROR\n");
+        printf("invalid section");
+        exit(EXIT_FAILURE);
+    }
+    for(int i = 0; i < NO_OF_SECTIONS; i++)
+    {
+        read(file,SECT_NAME,14);
+        SECT_NAME[14] = '\0';
+        read(file,&SECT_TYPE,1);
+        if((SECT_TYPE != 50 && SECT_TYPE != 92) && (SECT_TYPE != 33 && SECT_TYPE != 32))
+        {
+            printf("ERROR\n");
+            printf("invalid file\n");
+            exit(EXIT_FAILURE);
+        }
+        read(file,&SECT_OFFSET,4);
+        read(file,&SECT_SIZE,4);
+    }
+    lseek(file,-HEADER_SIZE,SEEK_END);
+    lseek(file,5,SEEK_CUR);
+    for(int i = 0; i < NO_OF_SECTIONS; i++)
+    {
+        if(i==section-1)
+        {
+            read(file,SECT_NAME,14);
+            SECT_NAME[14] = '\0';
+            read(file,&SECT_TYPE,1);
+            read(file,&SECT_OFFSET,4);
+            read(file,&SECT_SIZE,4);
+            if(SECT_SIZE==0)
+            {
+                printf("ERROR\n");
+                printf("invalid line\n");
+                exit(EXIT_FAILURE);
+            }
+            lseek(file, SECT_OFFSET, SEEK_SET);
+            char* b=(char*)malloc(sizeof(char)*SECT_SIZE);
+            int bytesRead;
+            int lineCount = 0;
+            while ((bytesRead = read(file, b, sizeof(b))) > 0) 
+            {
+                for (int i = 0; i < bytesRead; i++) 
+                {
+                    if (b[i] == '\n') 
+                    {
+                        lineCount++;
+                        if (lineCount == line) 
+                        {
+                            b[i] = '\0';    
+                            printf("SUCCESS\n");
+                            for (int j = i - 1; j >= 0; j--)
+                                printf("%c", b[j]);
+                            printf("\n");
+                            close(file);
+                            return;
+                        }
+                    }
+                }
+            }
+            if (bytesRead == -1) 
+            {
+                perror("ERROR");
+            } 
+            else 
+            {
+                printf("ERROR\ninvalid line\n");
+            }
+            close(file);
+            free(b);
+        }
+    } 
+}
+
+int fisier_parsare(char* path)
+{
+    int file = open(path,O_RDONLY);
+    if(file == -1)
+    {
+        perror("Could not open input file");
+        return -1;
+    }
+    int VERSION;
+    int NO_OF_SECTIONS;
+    int HEADER_SIZE;
+    int SECT_TYPE;
+    int SECT_OFFSET;
+    int SECT_SIZE;
+    char SECT_NAME[14];
+    char MAGIC[4];
+    lseek(file,-6,SEEK_END);
+    read(file,&HEADER_SIZE,2);
+    read(file,MAGIC,4);
+    MAGIC[4] = '\0';
+    if(strcmp(MAGIC,"Xrhm") != 0)
+    {
+        return 0;
+    }
+    lseek(file,-HEADER_SIZE,SEEK_CUR);
+    read(file,&VERSION,4);
+    if(VERSION < 98 || VERSION > 208)
+    {
+        return 0;
+    }
+    read(file,&NO_OF_SECTIONS,1);
+    if(NO_OF_SECTIONS < 6 || NO_OF_SECTIONS > 15)
+    {
+        return 0;
+    }
+    for(int i = 0; i < NO_OF_SECTIONS; i++)
+    {
+        read(file,SECT_NAME,14);
+        SECT_NAME[14] = '\0';
+        read(file,&SECT_TYPE,1);
+        if((SECT_TYPE != 50 && SECT_TYPE != 92) && (SECT_TYPE != 33 && SECT_TYPE != 32))
+        {
+            return 0;
+        }
+        read(file,&SECT_OFFSET,4);
+        read(file,&SECT_SIZE,4);
+        if(SECT_SIZE > 1411)
+        {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int findall(char* path, int s)
+{
+    DIR *dir = NULL;
+    struct dirent *entry = NULL;
+    struct stat statbuf;
+    dir = opendir(path);
+    if(dir == NULL) 
+    {
+        perror("Could not open directory");
+        return 0;
+    }
+    if (s==0)
+    {
+        printf("SUCCESS\n");
+        s=1;
+    }
+    while((entry = readdir(dir)) != NULL) 
+    {
+        if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) 
+        {
+            char fullPath[512];
+            snprintf(fullPath, 512, "%s/%s", path, entry->d_name);
+            if(lstat(fullPath, &statbuf) == 0) 
+            {
+                if(S_ISREG(statbuf.st_mode) && fisier_parsare(fullPath) == 1)
+                    printf("%s\n", fullPath);
+                if(S_ISDIR(statbuf.st_mode)) 
+                {
+                    findall(fullPath,s);
+                }
+            }
+        }
+    }
+    closedir(dir);
+    return 1;
 }
 
 int main(int argc, char **argv)
@@ -155,8 +352,43 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    printf("ERROR\n");
+                    printf("ERROR\nCould not open input file\n");
                 }
+            }
+        }
+        else if(strcmp(argv[1], "extract") == 0)
+        {
+            int line = 0;
+            int section = 0;
+            char* path;
+            for(int i = 2;i < argc;i++)
+            {
+                if(strstr(argv[i], "path=") != NULL)
+                    path = argv[i] + 5;
+                if(strstr(argv[i], "section=") != NULL)
+                    section = atoi(argv[i] + 8);
+                if(strstr(argv[i], "line=") != NULL)
+                    line = atoi(argv[i] + 5);
+            }
+            int file = open(path,O_RDONLY);
+            if(file >= 0)
+            {
+                extragere(file,section,line);
+                close(file);
+            }
+            else
+            {
+                printf("ERROR\nCould not open input file\n");
+            }
+        }
+        else if(strcmp(argv[1], "findall") == 0)
+        {
+            char* path;
+            if(strstr(argv[2], "path=") != NULL)
+            {
+                path = argv[2] + 5;
+                if(findall(path,0) == 0)
+                    printf("ERROR\ninvalid directory path\n");
             }
         }
     }
