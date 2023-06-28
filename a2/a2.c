@@ -6,128 +6,153 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define ONE 1
-#define TWO 2
-#define THREE 3
-#define FOUR 4
-#define FIVE 5
-#define SIX 6
-#define SEVEN 7
+pthread_barrier_t barrier;
 
-typedef int INTEGER;
-pthread_mutex_t mutexONE, mutexTWO;
-
-typedef struct thread_arg_t
+void *thread_func(void *thread_id)
 {
-	INTEGER process;
-	INTEGER thread;
-} INFO;
-
-void exect(INFO *thinfo)
-{
-	if (thinfo->process == TWO && thinfo->thread == ONE)
-		pthread_mutex_lock(&mutexONE);
-	info(BEGIN, thinfo->process, thinfo->thread);
-	if (thinfo->process == TWO && thinfo->thread == TWO)
-		pthread_mutex_unlock(&mutexONE);
-	if (thinfo->process == TWO && thinfo->thread == TWO)
-		pthread_mutex_lock(&mutexTWO);
-	info(END, thinfo->process, thinfo->thread);
-	if (thinfo->process == TWO && thinfo->thread == ONE)
-		pthread_mutex_unlock(&mutexTWO);
-}
-
-void create_threads(pthread_t t[], INFO thinfo[], INTEGER nr)
-{
-	for (INTEGER i = '\0'; i < nr; i++)
-		pthread_create(&t[i], '\0', (void *(*)(void *))exect, (void *)&thinfo[i]);
-	for (INTEGER i = '\0'; i < nr; i++)
-		pthread_join(t[i], '\0');
-}
-
-INTEGER pid2, pid3, pid4, pid5, pid6, pid7;
-
-INTEGER create_process(INTEGER id)
-{
-	INTEGER pid;
-	if ((pid = fork()) == '\0')
+    int tid = *(int *)thread_id;
+	if(tid == 2)
 	{
-		info(BEGIN, id, '\0');
-
-		if (id == ONE)
-		{
-			pid2 = create_process(TWO);
-			pid3 = create_process(THREE);
-			waitpid(pid2, '\0', '\0');
-			waitpid(pid3, '\0', '\0');
-		}
-		else if (id == TWO)
-		{
-			pthread_mutex_init(&mutexONE, '\0');
-			pthread_mutex_init(&mutexTWO, '\0');
-			pid4 = create_process(FOUR);
-			pid5 = create_process(FIVE);
-			pid7 = create_process(SEVEN);
-			pthread_t threads[4];
-			pthread_mutex_lock(&mutexONE);
-			INFO args[4] = {{TWO,ONE},{TWO,TWO},{TWO,THREE},{TWO,4}};
-			pthread_mutex_lock(&mutexTWO);
-			create_threads(threads, args, 4);
-			waitpid(pid4, '\0', '\0');
-			waitpid(pid5, '\0', '\0');
-			waitpid(pid7, '\0', '\0');
-		}
-		else if (id == THREE)
-		{
-			pid4 = create_process(FOUR);
-			pid5 = create_process(FIVE);
-			pid7 = create_process(SEVEN);
-			waitpid(pid4, '\0', '\0');
-			waitpid(pid5, '\0', '\0');
-			waitpid(pid7, '\0', '\0');
-		}
-		else if (id == FOUR)
-		{
-			info(BEGIN, FOUR, '\0');
-			info(END, FOUR, '\0');
-			exit('\0');
-		}
-		else if (id == FIVE)
-		{
-			info(BEGIN, FIVE, '\0');
-			info(END, FIVE, '\0');
-			exit('\0');
-		}
-		else if(id == SIX)
-        {
-            info(BEGIN, SIX, '\0');
-            info(END, SIX, '\0');
-            exit('\0');
-        }
-        else if (id == SEVEN)
-        {
-            pthread_mutex_init(&mutexONE, '\0');
-            pthread_mutex_init(&mutexTWO, '\0');
-            pthread_t threads[2];
-            INFO args[2] = {{SEVEN,ONE},{SEVEN,TWO}};
-            create_threads(threads, args, 2);
-            pthread_mutex_destroy(&mutexONE);
-            pthread_mutex_destroy(&mutexTWO);
-            exit('\0');
-        }
-        info(END, id, '\0');
-	    exit('\0');
-    }
-    return pid;
+		info(BEGIN, 2, tid);
+		pthread_barrier_wait(&barrier);
+    	info(END, 2, tid);
+	}
+	else
+	{
+		pthread_barrier_wait(&barrier);
+        info(BEGIN, 2, tid);
+        info(END, 2, tid);
+	}
+    pthread_exit(NULL);
 }
+
 int main()
 {
     init();
-    
-
+	//incepe P1
     info(BEGIN, 1, 0);
-    pid6 = create_process(SIX);
-    waitpid(pid6, '\0', '\0');
-    info(END, 1, 0);
+	pid_t P2, P3, P4, P5, P6, P7;
+	P2 = fork();
+	if(P2 == -1)
+	{
+		perror("Could not create process P2");
+		return -1;
+	}
+	else if(P2 == 0)
+	{
+		pthread_t threads[4]; // Array pentru a stoca ID-urile threadurilor
+    	int thread_ids[4] = {1, 2, 3, 4}; // ID-uri pentru fiecare thread
+		//incepe P2
+		info(BEGIN, 2, 0);
+		pthread_barrier_init(&barrier, NULL, 4);
+    	// Crearea threadurilor
+		for(int i = 0; i < 4; i++)
+		{
+			pthread_create(&threads[i], NULL, thread_func, (void *)&thread_ids[i]);
+		}
+		for(int i = 0; i < 4; i++)
+		{
+			pthread_join(threads[i], NULL);
+		}
+		pthread_barrier_destroy(&barrier);
+		//se termina P2
+		info(END, 2, 0);
+	}
+	else
+	{
+		//suntem in P1
+		P3 = fork();
+		if(P3 == -1)
+		{
+			perror("Could not create process P3");
+			return -1;
+		}
+		else if(P3 == 0)
+		{
+			//incepe P3
+			info(BEGIN, 3, 0);
+			P4 = fork();
+			if(P4 == -1)
+			{
+				perror("Could not create process P4");
+				return -1;
+			}
+			else if(P4 == 0)
+			{
+				//incepe P4
+				info(BEGIN, 4, 0);
+				P6 = fork();
+				if(P6 == -1)
+				{
+					perror("Could not create process P7");
+					return -1;
+				}
+				else if(P6 == 0)
+				{
+					//incepe P6
+					info(BEGIN, 6, 0);
+					//se termina P6
+					info(END, 6, 0);
+				}
+				else
+				{
+					//suntem in P4
+					waitpid(P6, NULL, 0);
+					//se termina P4
+					info(END, 4, 0);
+				}
+			}
+			else
+			{
+				///suntem in P3
+				P5 = fork();
+				if(P5 == -1)
+				{
+					perror("Could not create process P5");
+					return -1;
+				}
+				else if(P5 == 0)
+				{
+					//incepe P5
+					info(BEGIN, 5, 0);
+					//se termina P5
+					info(END, 5, 0);
+				}
+				else 
+				{
+					//suntem in P3
+					P7 = fork();
+					if(P7 == -1)
+					{
+						perror("Could not create process P6");
+						return -1;
+					}
+					else if(P7 == 0)
+					{
+						//incepe P7
+						info(BEGIN, 7, 0);
+						//se termina P7
+						info(END, 7, 0);
+					}
+					else 
+					{
+						waitpid(P4, NULL, 0);
+						waitpid(P5, NULL, 0);
+						waitpid(P7, NULL, 0);
+						//se termina P3
+						info(END, 3, 0);
+					}
+				}
+			}
+		}
+		else
+		{
+			//suntem in P1
+			waitpid(P2, NULL, 0);
+			waitpid(P3, NULL, 0);
+			//se termina P1
+			info(END, 1, 0);
+		}
+	}
     return 0;
 }
