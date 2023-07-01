@@ -14,6 +14,8 @@ int main()
 {
     int fd_write = -1, fd_read = -1;
     int shm;
+    int a;
+    char* d;
     // Create response pipe
     if (mkfifo(FIFO_WRITE, 0600) != 0) 
     {
@@ -106,16 +108,42 @@ int main()
 		    write(fd_write,"#",sizeof(unsigned char));
         }
     }
+    if(strcmp(s, "MAP_FILE")==0)
+    {
+        char file[250];
+        read(fd_read,file,sizeof(file));
+        int fd=open(file, O_RDONLY);
+        if(shm==-1)
+        {
+            write(fd_write, "MAP_FILE", strlen("MAP_FILE"));
+		    write(fd_write,"#",sizeof(unsigned char));
+            write(fd_write, "ERROR", strlen("ERROR"));
+		    write(fd_write,"#",sizeof(unsigned char));
+        }
+        a=lseek(fd,0,SEEK_END);
+        lseek(fd,0,SEEK_SET);
+        d=(char*)mmap(0,a, PROT_READ, MAP_SHARED, fd, 0);
+        if(d==(void*)-1)
+        {
+            write(fd_write, "MAP_FILE", strlen("MAP_FILE"));
+		    write(fd_write,"#",sizeof(unsigned char));
+            write(fd_write, "ERROR", strlen("ERROR"));
+		    write(fd_write,"#",sizeof(unsigned char));
+        }
+        write(fd_write, "MAP_FILE", strlen("MAP_FILE"));
+		write(fd_write,"#",sizeof(unsigned char));
+        write(fd_write, "SUCCESS", strlen("SUCCESS"));
+	    write(fd_write,"#",sizeof(unsigned char));
+    }
     if(strcmp(s, "EXIT")==0)
 	{
+        close(shm);
+        munmap(d,a);
+        close(fd_read);
+        shm_unlink("/ceMJzbj2");
         unlink(FIFO_WRITE);
         close(fd_write);
         return 0;
 	}
-    // Close pipes
-    close(fd_write);
-    close(fd_read);
-    // Delete response pipe
-    unlink(FIFO_WRITE);
     return 0;
 }
