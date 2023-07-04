@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-void listare(char* path, int size_smaller, char* name_starts_with, int recursiv)
+void listare(char* path, size_t size_smaller, char* name_starts_with, int recursiv)
 {
     DIR *dir = NULL;
     struct dirent *entry = NULL;
@@ -18,13 +18,14 @@ void listare(char* path, int size_smaller, char* name_starts_with, int recursiv)
         printf("ERROR\ninvalid directory path\n");
         return;
     }
+    char* fullPath = (char*)malloc(512*sizeof(char));
     while((entry = readdir(dir)) != NULL) 
     {
         if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) 
         {
             if((strlen(name_starts_with) != 0 && strstr(entry->d_name, name_starts_with) == entry->d_name) || name_starts_with[0] == '\0')
             {
-                char fullPath[512];
+                
                 snprintf(fullPath, 512, "%s/%s", path, entry->d_name);
                 if(lstat(fullPath, &statbuf) == 0) 
                 {
@@ -38,19 +39,20 @@ void listare(char* path, int size_smaller, char* name_starts_with, int recursiv)
             }     
         }
     }
+    free(fullPath);
     closedir(dir);
 }
 
 void parsare(int file)
 {
     int VERSION;
-    int NO_OF_SECTIONS;
-    int HEADER_SIZE;
-    int SECT_TYPE;
+    char NO_OF_SECTIONS;
+    short int HEADER_SIZE;
+    char SECT_TYPE;
     int SECT_OFFSET;
     int SECT_SIZE;
-    char SECT_NAME[14];
-    char MAGIC[4];
+    char SECT_NAME[15];
+    char MAGIC[5];
 
     lseek(file,-6,SEEK_END);
     read(file,&HEADER_SIZE,2);
@@ -106,17 +108,17 @@ void parsare(int file)
         printf("section%d: %s %d %d\n",i+1,SECT_NAME,SECT_TYPE,SECT_SIZE);
     } 
 }
-
+/*
 void extragere(int file, int section, int line)
 {
     int VERSION;
-    int NO_OF_SECTIONS;
-    int HEADER_SIZE;
-    int SECT_TYPE;
+    char NO_OF_SECTIONS;
+    short int HEADER_SIZE;
+    char SECT_TYPE;
     int SECT_OFFSET;
     int SECT_SIZE;
-    char SECT_NAME[14];
-    char MAGIC[4];
+    char SECT_NAME[15];
+    char MAGIC[5];
 
     lseek(file,-6,SEEK_END);
     read(file,&HEADER_SIZE,2);
@@ -217,15 +219,17 @@ void extragere(int file, int section, int line)
         }
     } 
 }
-
-int fisier_parsare(char* path)
+*/
+/*
+void extragere(const char* path, int section, int line)
 {
-    int file = open(path,O_RDONLY);
-    if(file == -1)
+    int file = open(path, O_RDONLY);
+    if (file == -1)
     {
-        perror("Could not open input file");
-        return -1;
+        printf("ERROR\nCould not open input file\n");
+        return;
     }
+
     int VERSION;
     int NO_OF_SECTIONS;
     int HEADER_SIZE;
@@ -234,6 +238,175 @@ int fisier_parsare(char* path)
     int SECT_SIZE;
     char SECT_NAME[14];
     char MAGIC[4];
+
+    lseek(file, -6, SEEK_END);
+    read(file, &HEADER_SIZE, 2);
+    read(file, MAGIC, 4);
+    MAGIC[4] = '\0';
+    if (strcmp(MAGIC, "Xrhm") != 0)
+    {
+        printf("ERROR\ninvalid file\n");
+        close(file);
+        return;
+    }
+
+    lseek(file, -HEADER_SIZE, SEEK_CUR);
+    read(file, &VERSION, 4);
+    if (VERSION < 98 || VERSION > 208)
+    {
+        printf("ERROR\ninvalid file\n");
+        close(file);
+        return;
+    }
+
+    read(file, &NO_OF_SECTIONS, 1);
+    if (NO_OF_SECTIONS < 6 || NO_OF_SECTIONS > 15)
+    {
+        printf("ERROR\ninvalid file\n");
+        close(file);
+        return;
+    }
+
+    if (section < 1 || section > NO_OF_SECTIONS)
+    {
+        printf("ERROR\ninvalid section\n");
+        close(file);
+        return;
+    }
+
+    for (int i = 0; i < NO_OF_SECTIONS; i++)
+    {
+        read(file, SECT_NAME, 14);
+        SECT_NAME[14] = '\0';
+        read(file, &SECT_TYPE, 1);
+
+        if ((SECT_TYPE != 50 && SECT_TYPE != 92) && (SECT_TYPE != 33 && SECT_TYPE != 32))
+        {
+            printf("ERROR\ninvalid file\n");
+            close(file);
+            return;
+        }
+
+        read(file, &SECT_OFFSET, 4);
+        read(file, &SECT_SIZE, 4);
+    }
+
+    lseek(file, -HEADER_SIZE, SEEK_END);
+    lseek(file, 5, SEEK_CUR);
+
+    for (int i = 0; i < NO_OF_SECTIONS; i++)
+    {
+        if (i == section - 1)
+        {
+            read(file, SECT_NAME, 14);
+            SECT_NAME[14] = '\0';
+            read(file, &SECT_TYPE, 1);
+            read(file, &SECT_OFFSET, 4);
+            read(file, &SECT_SIZE, 4);
+
+            if (SECT_SIZE == 0)
+            {
+                printf("ERROR\ninvalid line\n");
+                close(file);
+                return;
+            }
+
+            lseek(file, SECT_OFFSET, SEEK_SET);
+            char* buffer = (char*)malloc(sizeof(char) * SECT_SIZE);
+            int bytesRead;
+            if (buffer == NULL)
+            {
+                printf("ERROR\nmemory allocation failed\n");
+                close(file);
+                return;
+            }
+
+            bytesRead = read(file, buffer, SECT_SIZE);
+            if (bytesRead != SECT_SIZE)
+            {
+                printf("ERROR\nfailed to read section data\n");
+                free(buffer);
+                close(file);
+                return;
+            }
+
+            int lineCount = 0;
+            int lineStart = 0;
+            int lineEnd = 0;
+            int lineIndex = 0;
+
+            // Find the specified line in the section
+            for (int i = 0; i < SECT_SIZE; i++)
+            {
+                if (buffer[i] == '\n')
+                {
+                    lineCount++;
+                    if (lineCount == line)
+                    {
+                        lineEnd = i;
+                        break;
+                    }
+                    lineStart = i + 1;
+                }
+            }
+
+            // Extract the specified line
+            if (lineCount >= line)
+            {
+                int lineLength = lineEnd - lineStart;
+                char* lineBuffer = (char*)malloc(sizeof(char) * (lineLength + 1));
+                if (lineBuffer == NULL)
+                {
+                    printf("ERROR\nmemory allocation failed\n");
+                    free(buffer);
+                    close(file);
+                    return;
+                }
+                strncpy(lineBuffer, buffer + lineStart, lineLength);
+                lineBuffer[lineLength] = '\0';
+
+                printf("%s\n", lineBuffer);
+
+                free(lineBuffer);
+            }
+            else
+            {
+                printf("ERROR\ninvalid line\n");
+            }
+
+            free(buffer);
+            close(file);
+            return;
+        }
+        else
+        {
+            read(file, SECT_NAME, 14);
+            read(file, &SECT_TYPE, 1);
+            read(file, &SECT_OFFSET, 4);
+            read(file, &SECT_SIZE, 4);
+        }
+    }
+
+    printf("ERROR\ninvalid section\n");
+    close(file);
+}
+*/
+int fisier_parsare(char* path)
+{
+    int file = open(path,O_RDONLY);
+    if(file == -1)
+    {
+        //perror("Could not open input file");
+        return -1;
+    }
+    int VERSION;
+    char NO_OF_SECTIONS;
+    short int HEADER_SIZE;
+    char SECT_TYPE;
+    int SECT_OFFSET;
+    int SECT_SIZE;
+    char SECT_NAME[15];
+    char MAGIC[5];
     lseek(file,-6,SEEK_END);
     read(file,&HEADER_SIZE,2);
     read(file,MAGIC,4);
@@ -272,56 +445,49 @@ int fisier_parsare(char* path)
     return 1;
 }
 
-int findall(char* path, int s)
+int findall(char* path)
 {
     DIR *dir = NULL;
     struct dirent *entry = NULL;
     struct stat statbuf;
     dir = opendir(path);
-    if(dir == NULL) 
-    {
-        perror("Could not open directory");
-        return 0;
-    }
-    if (s==0)
-    {
-        printf("SUCCESS\n");
-        s=1;
-    }
+    char* fullPath = (char*)malloc(512*sizeof(char));
     while((entry = readdir(dir)) != NULL) 
     {
         if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) 
         {
-            char fullPath[512];
             snprintf(fullPath, 512, "%s/%s", path, entry->d_name);
-            if(lstat(fullPath, &statbuf) == 0) 
+	        if(lstat(fullPath, &statbuf) == 0)
             {
                 if(S_ISREG(statbuf.st_mode) && fisier_parsare(fullPath) == 1)
                     printf("%s\n", fullPath);
                 if(S_ISDIR(statbuf.st_mode)) 
                 {
-                    findall(fullPath,s);
+                    findall(fullPath);
                 }
             }
+	        
         }
     }
+    free(fullPath);
     closedir(dir);
-    return 1;
+    return 0;
 }
 
 int main(int argc, char **argv)
 {
+    char* path;
     if(argc >= 2){
         if(strcmp(argv[1], "variant") == 0)
         {
             printf("65628\n");
         }
-        else if(strcmp(argv[1], "list") == 0)
+        if(strcmp(argv[1], "list") == 0)
         {
             int recursiv = 0;
-            int size_smaller = 0;
+            size_t size_smaller = 0;
             char* name_starts_with = "";
-            char* path;
+            DIR *dir = NULL;
             for(int i = 2;i < argc;i++)
             {
                 if(strstr(argv[i], "path=") != NULL)
@@ -333,17 +499,21 @@ int main(int argc, char **argv)
                 if(strstr(argv[i], "name_starts_with=") != NULL)
                     name_starts_with = argv[i] + 17;
             }
-            if(opendir(path)!=NULL)
+            dir = opendir(path);
+            if(dir!=NULL)
             { 
                 printf("SUCCESS\n");
+                closedir(dir);
             }
             listare(path, size_smaller, name_starts_with, recursiv);
+            free(name_starts_with);
+            free(path);
         }
-        else if(strcmp(argv[1], "parse") == 0)
+        if(strcmp(argv[1], "parse") == 0)
         {
             if(strstr(argv[2], "path=") != NULL)
             {
-                char* path = argv[2] + 5;
+                path = argv[2] + 5;
                 int file = open(path,O_RDONLY);
                 if(file >= 0)
                 {
@@ -354,13 +524,14 @@ int main(int argc, char **argv)
                 {
                     printf("ERROR\nCould not open input file\n");
                 }
+                //free(path);
             }
         }
-        else if(strcmp(argv[1], "extract") == 0)
+        /*
+        if(strcmp(argv[1], "extract") == 0)
         {
             int line = 0;
             int section = 0;
-            char* path;
             for(int i = 2;i < argc;i++)
             {
                 if(strstr(argv[i], "path=") != NULL)
@@ -380,15 +551,28 @@ int main(int argc, char **argv)
             {
                 printf("ERROR\nCould not open input file\n");
             }
+            //free(path);
         }
-        else if(strcmp(argv[1], "findall") == 0)
+        */
+        if(strcmp(argv[1], "findall") == 0)
         {
-            char* path;
             if(strstr(argv[2], "path=") != NULL)
             {
                 path = argv[2] + 5;
-                if(findall(path,0) == 0)
+                DIR *dir = NULL;
+  		        dir = opendir(path);
+            	if (path == NULL || strcmp(path,"") == 0 || dir==NULL) 
+                {
                     printf("ERROR\ninvalid directory path\n");
+                    closedir(dir);
+           	    }
+                if(path!=NULL)
+                {
+                    printf("SUCCESS\n");
+                    findall(path);
+                }
+                //free(path);
+                closedir(dir);
             }
         }
     }
